@@ -1,3 +1,5 @@
+import edu.princeton.cs.algs4.WeightedQuickUnionUF;
+
 /*
  * We model a percolation system using an n-by-n grid of sites.
  * 
@@ -14,10 +16,7 @@ public class Percolation {
 
     // By convention, the row and column indices are integers between 1 and n,
     // where (1, 1) is the upper-left site
-    private int[] sites;
-
-    // keep track of the size of each tree so we can construct a weighted tree
-    private int[] size;
+    private WeightedQuickUnionUF uf;
 
     // keep track of the open state of each cell independently of connectedness
     private boolean[] open;
@@ -38,63 +37,27 @@ public class Percolation {
             throw new IllegalArgumentException();
         }
         this.n = n;
-        sites = new int[n*n + 2];
-        size = new int[n*n + 2];
+        uf = new WeightedQuickUnionUF(n*n + 2);
         open = new boolean[n*n + 2];
         vTop = n*n;
         vBottom = n*n+1;
 
         // initially all sites are blocked
-        for (int i = 0; i < sites.length; i++) {
+        for (int i = 0; i < uf.count(); i++) {
             open[i] = false;
-            sites[i] = i;
-            size[i] = 1;
         }
 
         // connect open vTop to first n-1 nodes (the top row)
-        size[vTop] = 1;
         open[vTop] = true;
         for (int i = 0; i < n; i++) {
-            union(vTop, i);
+            uf.union(vTop, i);
         }
 
         // connect open vBottom to last n-1 nodes (the bottom row)
-        size[vBottom] = 1;
         open[vBottom] = true;
         for (int i = n*(n-1); i < n*n; i++) {
-            union(vBottom, i);
+            uf.union(vBottom, i);
         }
-    }
-
-    // find the root node, compress the path
-    private int root(int i) {
-        while (i != sites[i]) {
-            // make every other node point to its grandparent
-            sites[i] = sites[sites[i]];
-            i = sites[i];
-        }
-        return i;
-    }
-
-    // join two nodes
-    private void union(int p, int q) {
-        int i = root(p);
-        int j = root(q);
-        if (i == j) {
-            return;
-        }
-        if (size[i] < size[j]) {
-            sites[i] = j;
-            size[j] = size[i] + size[j];
-        }
-        else {
-            sites[j] = i;
-            size[i] = size[j] + size[i];
-        }
-    }
-
-    private boolean find(int p, int q) {
-        return root(p) == root(q);
     }
 
     // convert the row/column numbers to index in sites array
@@ -103,6 +66,19 @@ public class Percolation {
             throw new IndexOutOfBoundsException();
         }
         return (row - 1) * n + (col - 1);
+    }
+
+    // is site (row, col) open?
+    public boolean isOpen(int row, int col) {
+        int index = index(row, col);
+        return open[index];
+    }
+
+    // A full site is an open site that can be connected to an open site
+    // in the top row via a chain of neighboring (left, right, up, down) open sites.
+    public boolean isFull(int row, int col) {
+        int index = index(row, col);
+        return open[index] && uf.find(vTop) == uf.find(index);
     }
 
     // open site (row, col) if it is not open already
@@ -121,23 +97,10 @@ public class Percolation {
                 // if neighboring cell is open, 
                 if (isOpen(nrow, ncol)) {
                     int neighbor = index(nrow, ncol);
-                    union(index, neighbor);
+                    uf.union(index, neighbor);
                 }
             }
         }
-    }
-
-    // is site (row, col) open?
-    public boolean isOpen(int row, int col) {
-        int index = index(row, col);
-        return open[index];
-    }
-
-    // A full site is an open site that can be connected to an open site
-    // in the top row via a chain of neighboring (left, right, up, down) open sites.
-    public boolean isFull(int row, int col) {
-        int index = index(row, col);
-        return open[index] && find(vTop, index);
     }
 
     // We say the system percolates if there is a full site in the bottom row.
@@ -148,7 +111,7 @@ public class Percolation {
         if (n == 1) {
             return open[0];
         }
-        return find(vTop, vBottom);
+        return uf.find(vTop) == uf.find(vBottom);
     }
 
     // test client (optional)
